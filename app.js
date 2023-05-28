@@ -8,6 +8,19 @@ const port = 5000;
 app.use(cors());
 app.use(express.json());
 
+app.get("/transactions", async (req, res) => {
+  const acc_ktp = "3525015201880002";
+  try {
+    const allTransaction = await db.query(
+      "SELECT * FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID",
+      [acc_ktp]
+    );
+    res.json(allTransaction.rows);
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
