@@ -2,12 +2,34 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const { db } = require("./db");
+const session = require("express-session");
 const port = 5000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(
+  session({
+    secret: "rahasiabanget",
+    cookie: {
+      sameSite: "strict",
+    },
+  })
+);
+
+const acc_ktp = 3504098213010001;
+
+app.get("/account", async (req, res) => {
+  try {
+    const acc = await db.query("SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1", [
+      acc_ktp,
+    ]);
+    res.json(acc.rows);
+  } catch (err) {
+    console.log(err.message);
+  }
+});
 
 app.post("/account", async (req, res) => {
   try {
@@ -25,8 +47,7 @@ app.get("/transactions", async (req, res) => {
   }
 });
 
-app.get("/transactions/:id", async (req, res) => {
-  const acc_ktp = req.params.id;
+app.get("/transactions", async (req, res) => {
   try {
     const allTransaction = await db.query(
       "SELECT * FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID",
@@ -38,8 +59,7 @@ app.get("/transactions/:id", async (req, res) => {
   }
 });
 
-app.post("/transactions/:id", async (req, res) => {
-  const acc_ktp = req.params.id;
+app.post("/transactions", async (req, res) => {
   try {
     const { ...transaction } = req.body;
     // console.log(transaction);
@@ -55,15 +75,15 @@ app.post("/transactions/:id", async (req, res) => {
 });
 
 app.get("/invoices", async (req, res) => {
-  const acc_ktp = 1111222233334444;
   try {
     const allInvoices = await db.query(
       `
-    SELECT * FROM LOAN_INVOICE
-    INNER JOIN TRANSACTION
-    ON LI_T_ID = T_ID
-    WHERE T_ACC_KTP_NUM = $1
-    ORDER BY LI_DUE_DATE;`,
+      SELECT LI_ID, LI_T_ID, LI_STATUS, LI_DUE_DATE, LI_TOTAL_PAYMENT
+      FROM LOAN_INVOICE
+      INNER JOIN TRANSACTION
+      ON LI_T_ID = T_ID
+      WHERE T_ACC_KTP_NUM = $1
+      ORDER BY LI_DUE_DATE, LI_ID;`,
       [acc_ktp]
     );
     res.json(allInvoices.rows);
@@ -71,6 +91,8 @@ app.get("/invoices", async (req, res) => {
     console.log(err);
   }
 });
+
+app.post("/pay", (req, res) => {});
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
