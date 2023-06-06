@@ -4,6 +4,7 @@ const cors = require("cors");
 const { db } = require("./db");
 const session = require("express-session");
 const store = new session.MemoryStore();
+const path = require("path");
 const port = 5000;
 
 // Middleware
@@ -167,6 +168,38 @@ app.get("/invoices", async (req, res) => {
 });
 
 app.post("/pay", (req, res) => {});
+
+async function validate(email, password) {
+  const credentials = await db.query(
+    "SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1",
+    [email]
+  );
+  console.log(credentials.rows);
+}
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  console.log(req.body);
+  try {
+    const acc = await db.query(
+      "SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1 AND ACC_PASSWORD = $2",
+      [email, password]
+    );
+    if (acc.rowCount === 1) {
+      res.redirect("home.html");
+    } else {
+      res.status(401).sendFile(path.join(__dirname, "public", "login.html")); // Send login.html again
+    }
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).sendFile(path.join(__dirname, "public", "login.html")); // Send login.html in case of server error
+  }
+});
+
+app.post("/logout", (req, res) => {
+  req.session.destroy();
+  res.json({ message: "Logout successful" });
+});
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
