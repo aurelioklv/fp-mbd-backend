@@ -3,7 +3,6 @@ const app = express();
 const cors = require("cors");
 const { db } = require("./db");
 const session = require("express-session");
-const store = new session.MemoryStore();
 const path = require("path");
 const port = 5000;
 
@@ -15,58 +14,105 @@ app.use(
   session({
     secret: "rahasiabanget",
     cookie: {
-      maxAge: 30000,
+      maxAge: 5 * 60 * 1000,
     },
     resave: false,
     saveUninitialized: false,
-    store,
+    rolling: true,
   })
 );
 
-// app.use((req, res, next) => {
-//   console.log(store);
-//   next();
-// });
+app.set("view engine", "ejs");
 
-const acc_ktp = 3504098213010001;
-
-app.use(express.static("public"));
-
-app.get("/account", async (req, res) => {
-  const { email, ktp } = req.query;
+app.get("/", async (req, res) => {
   try {
-    if (email) {
-      const acc = await db.query("SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1", [
-        email,
-      ]);
-      if (acc.rows.length === 0) {
-        return res.json({ email_exists: false }); // Account not found
-      }
-      res.json({ email_exists: true });
-    } else if (ktp) {
-      const acc = await db.query(
-        "SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1",
-        [ktp]
-      );
-      if (acc.rows.length === 0) {
-        return res.json({ ktp_exists: false }); // Account not found
-      }
-      res.json({ ktp_exists: true });
+    if (req.session.loggedIn) {
+      res.redirect("/home");
     } else {
-      const acc = await db.query(
-        "SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1",
-        [acc_ktp]
-      );
-      res.json(acc.rows);
+      res.redirect("/login");
     }
   } catch (err) {
     console.log(err.message);
   }
 });
 
-app.post("/account", async (req, res) => {
+app.get("/login", (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      res.redirect("/home");
+    } else {
+      res.render("login.ejs");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    console.log(email, password);
+    const acc = await db.query(
+      "SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1 AND ACC_PASSWORD = $2",
+      [email, password]
+    );
+    if (acc.rows.length === 1) {
+      req.session.user = acc.rows[0];
+      req.session.loggedIn = true;
+      req.session.userKTP = acc.rows[0].acc_ktp_num;
+      res.redirect("/home");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+// Check if email exists
+app.get("/check-email-exists", async (req, res) => {
+  try {
+    const { email } = req.query;
+    const acc = await db.query("SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1", [
+      email,
+    ]);
+    const emailExists = acc.rows.length > 0;
+    res.json({ email_exists: emailExists });
+  } catch (err) {
+    console.log(err.message);
+    res.sendStatus(500);
+  }
+});
+
+//Check if KTP exists
+app.get("/check-ktp-exists", async (req, res) => {
+  try {
+    const { ktp } = req.query;
+    const acc = await db.query("SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1", [
+      ktp,
+    ]);
+    const ktpExists = acc.rows.length > 0;
+    res.json({ ktp_exists: ktpExists });
+  } catch (err) {
+    console.log(err.message);
+    res.sendStatus(500);
+  }
+});
+
+app.get("/signup", (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      res.redirect("/home");
+    } else {
+      res.render("daftar.ejs");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+app.post("/signup", async (req, res) => {
   try {
     const data = req.body;
+    console.log(data);
     const new_acc = await db.query(
       `INSERT INTO ACCOUNT(
           ACC_KTP_NUM,
@@ -106,103 +152,111 @@ app.post("/account", async (req, res) => {
         data.password,
       ]
     );
-    res.redirect("login.html");
+    res.redirect("/login");
     // res.sendStatus(200).json({ message: "Terdaftar" });
   } catch (err) {
     console.log(err.message);
   }
 });
 
-app.get("/transactions", async (req, res) => {
+app.get("/home", async (req, res) => {
   try {
-    const allTransaction = await db.query("SELECT * FROM TRANSACTION");
-    res.json(allTransaction.rows);
-  } catch (err) {
-    console.log(err.message);
-  }
-});
+    if (req.session.loggedIn) {
+      const ktp = req.session.userKTP;
+      const allInvoices = await db.query(
+        `
+        SELECT LI_ID, LI_T_ID, LI_STATUS, LI_DUE_DATE, LI_TOTAL_PAYMENT
+        FROM LOAN_INVOICE
+        INNER JOIN TRANSACTION
+        ON LI_T_ID = T_ID
+        WHERE T_ACC_KTP_NUM = $1
+        ORDER BY LI_DUE_DATE, LI_ID;`,
+        [ktp]
+      );
 
-app.get("/transactions", async (req, res) => {
-  try {
-    const allTransaction = await db.query(
-      "SELECT * FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID",
-      [acc_ktp]
-    );
-    res.json(allTransaction.rows);
-  } catch (err) {
-    console.log(err.message);
-  }
-});
-
-app.post("/transactions", async (req, res) => {
-  try {
-    const { ...transaction } = req.body;
-    // console.log(transaction);
-
-    const newTransaction = await db.query(
-      "INSERT INTO TRANSACTION (T_ACC_KTP_NUM, T_LT_PERIOD, T_DATE) VALUES($1, $2, date_trunc('second', NOW())) RETURNING *;",
-      [acc_ktp, transaction.t_lt_period]
-    );
-    res.json(newTransaction.rows);
-  } catch (err) {
-    console.log(err.message);
-  }
-});
-
-app.get("/invoices", async (req, res) => {
-  try {
-    const allInvoices = await db.query(
-      `
-      SELECT LI_ID, LI_T_ID, LI_STATUS, LI_DUE_DATE, LI_TOTAL_PAYMENT
-      FROM LOAN_INVOICE
-      INNER JOIN TRANSACTION
-      ON LI_T_ID = T_ID
-      WHERE T_ACC_KTP_NUM = $1
-      ORDER BY LI_DUE_DATE, LI_ID;`,
-      [acc_ktp]
-    );
-    res.json(allInvoices.rows);
+      const acc = await db.query(
+        "SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1",
+        [ktp]
+      );
+      userData = acc.rows[0];
+      invoicesData = allInvoices.rows;
+      res.render("home.ejs", {
+        invoices: invoicesData,
+        user: userData,
+      });
+    } else {
+      res.redirect("/login"); // Redirect to the login page if not logged in
+    }
   } catch (err) {
     console.log(err);
   }
 });
 
-app.post("/pay", (req, res) => {});
-
-async function validate(email, password) {
-  const credentials = await db.query(
-    "SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1",
-    [email]
-  );
-  console.log(credentials.rows);
-}
-
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  console.log(req.body);
+app.get("/account", async (req, res) => {
   try {
-    const acc = await db.query(
-      "SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1 AND ACC_PASSWORD = $2",
-      [email, password]
-    );
-    if (acc.rowCount === 1) {
-      res.redirect("home.html");
+    if (req.session.loggedIn) {
+      const ktp = req.session.user.acc_ktp_num;
+      const acc = await db.query(
+        "SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1",
+        [ktp]
+      );
+      userData = acc.rows[0];
+      res.render("akun.ejs", { user: userData });
     } else {
-      res.status(401).sendFile(path.join(__dirname, "public", "login.html")); // Send login.html again
+      res.redirect("/login");
     }
   } catch (err) {
     console.log(err.message);
-    res.status(500).sendFile(path.join(__dirname, "public", "login.html")); // Send login.html in case of server error
   }
 });
 
-app.post("/logout", (req, res) => {
-  req.session.destroy();
-  res.json({ message: "Logout successful" });
+app.put("/account", async (req, res) => {});
+
+app.get("/loan", (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      res.render("ajukanPeminjaman.ejs");
+    } else {
+      res.redirect("/login");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
 });
 
-app.get("/", (req, res) => {
-  res.send("Hello World!");
+app.post("/confirm", async (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      res.render("konfirmasiPeminjaman.ejs", {
+        confirmation: req.body,
+        user: req.session.user,
+      });
+    } else {
+      res.redirect("/login");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+app.get("/transaction", async (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      const transactions = await db.query(
+        "SELECT * FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1",
+        [req.session.user.acc_ktp_num]
+      );
+      const transactionData = transactions.rows;
+      res.render("transaksi.ejs", {
+        transactions: transactionData,
+        user: req.session.user,
+      });
+    } else {
+      res.redirect("/login");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
 });
 
 app.listen(port, () => {
