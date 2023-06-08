@@ -97,20 +97,6 @@ app.get("/check-ktp-exists", async (req, res) => {
   }
 });
 
-app.get("/get-account-balance", async (req, res) => {
-  try {
-    const ktp = req.session.user.acc_ktp_num;
-    const acc = await db.query("SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1", [
-      ktp,
-    ]);
-    const balance = acc.rows[0].acc_balance;
-    res.json({ balance });
-  } catch (err) {
-    console.log(err.message);
-    res.sendStatus(500);
-  }
-});
-
 app.get("/signup", (req, res) => {
   try {
     if (req.session.loggedIn) {
@@ -173,10 +159,37 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-app.get("/home", async (req, res) => {
+const updateUserDataMiddleware = async (req, res, next) => {
   try {
     if (req.session.loggedIn) {
-      const ktp = req.session.userKTP;
+      const acc = await db.query(
+        "SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1",
+        [req.session.user.acc_ktp_num]
+      );
+      req.session.user = acc.rows[0];
+    }
+    next();
+  } catch (err) {
+    console.log(err.message);
+  }
+};
+
+app.get("/get-account-info", updateUserDataMiddleware, (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      console.log(req.session.user);
+      res.json({ user: req.session.user });
+    } else {
+      res.status(401);
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+app.get("/home", updateUserDataMiddleware, async (req, res) => {
+  try {
+    if (req.session.loggedIn) {
       const allInvoices = await db.query(
         `
         SELECT LI_ID, LI_T_ID, LI_STATUS, LI_DUE_DATE, LI_TOTAL_PAYMENT
@@ -185,18 +198,13 @@ app.get("/home", async (req, res) => {
         ON LI_T_ID = T_ID
         WHERE T_ACC_KTP_NUM = $1
         ORDER BY LI_DUE_DATE, LI_ID;`,
-        [ktp]
+        [req.session.user.acc_ktp_num]
       );
 
-      const acc = await db.query(
-        "SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1",
-        [ktp]
-      );
-      userData = acc.rows[0];
       invoicesData = allInvoices.rows;
       res.render("home.ejs", {
         invoices: invoicesData,
-        user: userData,
+        user: req.session.user,
       });
     } else {
       res.redirect("/login"); // Redirect to the login page if not logged in
@@ -206,16 +214,10 @@ app.get("/home", async (req, res) => {
   }
 });
 
-app.get("/account", async (req, res) => {
+app.get("/account", updateUserDataMiddleware, async (req, res) => {
   try {
     if (req.session.loggedIn) {
-      const ktp = req.session.user.acc_ktp_num;
-      const acc = await db.query(
-        "SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1",
-        [ktp]
-      );
-      userData = acc.rows[0];
-      res.render("akun.ejs", { user: userData });
+      res.render("akun.ejs", { user: req.session.user });
     } else {
       res.redirect("/login");
     }
@@ -226,7 +228,7 @@ app.get("/account", async (req, res) => {
 
 app.put("/account", async (req, res) => {});
 
-app.get("/loan", (req, res) => {
+app.get("/loan", updateUserDataMiddleware, (req, res) => {
   try {
     if (req.session.loggedIn) {
       res.render("ajukanPeminjaman.ejs", { user: req.session.user });
@@ -253,11 +255,11 @@ app.post("/confirm", async (req, res) => {
   }
 });
 
-app.get("/transaction", async (req, res) => {
+app.get("/transaction", updateUserDataMiddleware, async (req, res) => {
   try {
     if (req.session.loggedIn) {
       const transactions = await db.query(
-        "SELECT * FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1",
+        "SELECT * FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID DESC",
         [req.session.user.acc_ktp_num]
       );
       const transactionData = transactions.rows;
@@ -277,8 +279,6 @@ app.post("/transaction", async (req, res) => {
   try {
     if (req.session.loggedIn) {
       const { loan, period } = req.body;
-      const user = req.session.user;
-      console.log(user);
       const transactions = await db.query(
         `INSERT INTO TRANSACTION (
           T_ACC_KTP_NUM, T_LT_PERIOD,
@@ -287,7 +287,7 @@ app.post("/transaction", async (req, res) => {
           T_MONTHLY_PAYMENT,
           T_PAYMENT_COUNT)
           VALUES($1, $2, date_trunc('second', CURRENT_TIMESTAMP), $3, NULL, 0);`,
-        [user.acc_ktp_num, period, loan]
+        [req.session.user.acc_ktp_num, period, loan]
       );
       res.redirect("/transaction");
     } else {
