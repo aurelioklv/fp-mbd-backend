@@ -307,6 +307,41 @@ app.get("/logout", (req, res) => {
   });
 });
 
+app.get("/invoice", updateUserDataMiddleware, async (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      const id = req.query.id;
+      const invoice = await db.query(
+        "SELECT * FROM LOAN_INVOICE WHERE LI_ID = $1",
+        [id]
+      );
+      const invoiceData = invoice.rows[0];
+      res.render("bayar.ejs", { invoice: invoiceData, user: req.session.user });
+    } else {
+      res.redirect("/login");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+app.post("/pay", async (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      const id = req.body.id;
+      const paid = await db.query(
+        "UPDATE LOAN_INVOICE SET LI_STATUS = TRUE WHERE LI_ID = $1",
+        [id]
+      );
+      res.redirect("/home");
+    } else {
+      res.redirect("/login");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server has started on port ${port}`);
 });
