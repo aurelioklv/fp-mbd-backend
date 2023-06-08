@@ -97,6 +97,20 @@ app.get("/check-ktp-exists", async (req, res) => {
   }
 });
 
+app.get("/get-account-balance", async (req, res) => {
+  try {
+    const ktp = req.session.user.acc_ktp_num;
+    const acc = await db.query("SELECT * FROM ACCOUNT WHERE ACC_KTP_NUM = $1", [
+      ktp,
+    ]);
+    const balance = acc.rows[0].acc_balance;
+    res.json({ balance });
+  } catch (err) {
+    console.log(err.message);
+    res.sendStatus(500);
+  }
+});
+
 app.get("/signup", (req, res) => {
   try {
     if (req.session.loggedIn) {
@@ -215,7 +229,7 @@ app.put("/account", async (req, res) => {});
 app.get("/loan", (req, res) => {
   try {
     if (req.session.loggedIn) {
-      res.render("ajukanPeminjaman.ejs");
+      res.render("ajukanPeminjaman.ejs", { user: req.session.user });
     } else {
       res.redirect("/login");
     }
@@ -257,6 +271,40 @@ app.get("/transaction", async (req, res) => {
   } catch (err) {
     console.log(err.message);
   }
+});
+
+app.post("/transaction", async (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      const { loan, period } = req.body;
+      const user = req.session.user;
+      console.log(user);
+      const transactions = await db.query(
+        `INSERT INTO TRANSACTION (
+          T_ACC_KTP_NUM, T_LT_PERIOD,
+          T_DATE,
+          T_LOAN,
+          T_MONTHLY_PAYMENT,
+          T_PAYMENT_COUNT)
+          VALUES($1, $2, date_trunc('second', CURRENT_TIMESTAMP), $3, NULL, 0);`,
+        [user.acc_ktp_num, period, loan]
+      );
+      res.redirect("/transaction");
+    } else {
+      res.redirect("/login");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+app.get("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("Error destroying session:", err);
+    }
+    res.redirect("/login");
+  });
 });
 
 app.listen(port, () => {
