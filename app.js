@@ -336,7 +336,7 @@ app.post("/pay", async (req, res) => {
     if (req.session.loggedIn) {
       const id = req.body.id;
       const paid = await db.query(
-        "UPDATE LOAN_INVOICE SET LI_STATUS = TRUE WHERE LI_ID = $1",
+        "UPDATE LOAN_INVOICE SET LI_STATUS = TRUE, LI_PAYMENT_DATE = NOW() WHERE LI_ID = $1",
         [id]
       );
       res.redirect("/home");
