@@ -198,7 +198,7 @@ app.get("/home", updateUserDataMiddleware, async (req, res) => {
     if (req.session.loggedIn) {
       const allInvoices = await db.query(
         `
-        SELECT LI_ID, LI_T_ID, LI_STATUS, LI_DUE_DATE, LI_TOTAL_PAYMENT
+        SELECT *
         FROM LOAN_INVOICE
         INNER JOIN TRANSACTION
         ON LI_T_ID = T_ID
@@ -318,7 +318,7 @@ app.get("/invoice", updateUserDataMiddleware, async (req, res) => {
     if (req.session.loggedIn) {
       const id = req.query.id;
       const invoice = await db.query(
-        "SELECT * FROM LOAN_INVOICE WHERE LI_ID = $1",
+        "SELECT * FROM LOAN_INVOICE INNER JOIN TRANSACTION ON T_ID = LI_T_ID WHERE LI_ID = $1",
         [id]
       );
       const invoiceData = invoice.rows[0];
