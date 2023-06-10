@@ -3,7 +3,7 @@ const app = express();
 const cors = require("cors");
 const { db } = require("./db");
 const session = require("express-session");
-const path = require("path");
+const crypto = require("crypto-js");
 const port = 5000;
 
 // Middleware
@@ -52,15 +52,22 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     console.log(email, password);
-    const acc = await db.query(
-      "SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1 AND ACC_PASSWORD = $2",
-      [email, password]
-    );
+    const acc = await db.query("SELECT * FROM ACCOUNT WHERE ACC_EMAIL = $1", [
+      email,
+    ]);
     if (acc.rows.length === 1) {
-      req.session.user = acc.rows[0];
-      req.session.loggedIn = true;
-      req.session.userKTP = acc.rows[0].acc_ktp_num;
-      res.redirect("/home");
+      const storedPassword = acc.rows[0].acc_password;
+      const hashedInputPassword = crypto.SHA256(password).toString();
+      if (storedPassword === hashedInputPassword) {
+        req.session.user = acc.rows[0];
+        req.session.loggedIn = true;
+        req.session.userKTP = acc.rows[0].acc_ktp_num;
+        res.redirect("/home");
+      } else {
+        res.status(401).json({ message: "Incorrect Password" });
+      }
+    } else {
+      res.status(404).json({ message: "User not found" });
     }
   } catch (err) {
     console.log(err.message);
@@ -112,7 +119,7 @@ app.get("/signup", (req, res) => {
 app.post("/signup", async (req, res) => {
   try {
     const data = req.body;
-    console.log(data);
+    const hashedPassword = crypto.SHA256(data.password).toString();
     const new_acc = await db.query(
       `INSERT INTO ACCOUNT(
           ACC_KTP_NUM,
@@ -149,11 +156,10 @@ app.post("/signup", async (req, res) => {
         data.emergency_contact,
         data.emergency_contact_rel,
         data.mother,
-        data.password,
+        hashedPassword,
       ]
     );
     res.redirect("/login");
-    // res.sendStatus(200).json({ message: "Terdaftar" });
   } catch (err) {
     console.log(err.message);
   }
