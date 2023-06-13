@@ -232,7 +232,23 @@ app.get("/account", updateUserDataMiddleware, async (req, res) => {
   }
 });
 
-app.put("/account", async (req, res) => {});
+app.put("/account", async (req, res) => {
+  try {
+    if (req.session.loggedIn) {
+      const data = req.body;
+      const updated = await db.query(
+        `UPDATE ACCOUNT
+          SET ACC_PHONE_NUM = $1,
+        `,
+        [data.phone]
+      );
+    } else {
+      res.redirect("/login");
+    }
+  } catch (err) {
+    console.log(err.message);
+  }
+});
 
 app.get("/loan", updateUserDataMiddleware, (req, res) => {
   try {
