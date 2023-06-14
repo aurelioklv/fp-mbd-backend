@@ -232,16 +232,36 @@ app.get("/account", updateUserDataMiddleware, async (req, res) => {
   }
 });
 
-app.put("/account", async (req, res) => {
+app.post("/account", async (req, res) => {
   try {
     if (req.session.loggedIn) {
       const data = req.body;
+      console.log(data);
       const updated = await db.query(
-        `UPDATE ACCOUNT
-          SET ACC_PHONE_NUM = $1,
+        `UPDATE ACCOUNT SET
+          ACC_PHONE_NUM = $1,
+          ACC_ADDRESS = $2,
+          ACC_JOB = $3,
+          ACC_SALARY = $4,
+          ACC_BANK = $5,
+          ACC_BANK_NUM = $6,
+          ACC_EMERGENCY_PHONE_NUM = $7,
+          ACC_EMERGENCY_CONTACT_RELATIONSHIP = $8
+          WHERE ACC_KTP_NUM = $9;
         `,
-        [data.phone]
+        [
+          data.phone,
+          data.address,
+          data.job,
+          data.salary,
+          data.bank,
+          data.bank_num,
+          data.emergency_contact,
+          data.emergency_contact_rel,
+          req.session.user.acc_ktp_num,
+        ]
       );
+      res.redirect("/account");
     } else {
       res.redirect("/login");
     }
