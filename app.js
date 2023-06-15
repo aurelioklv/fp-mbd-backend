@@ -376,12 +376,12 @@ app.get("/transaction", updateUserDataMiddleware, async (req, res) => {
   try {
     if (req.session.loggedIn) {
       const transactions = await db.query(
-        "SELECT *, T_DATE AS log_date FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID DESC",
+        "SELECT *, T_DATE AS log_date, T_ID AS log_id, T_LOAN AS log_money FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID DESC",
         [req.session.user.acc_ktp_num]
       );
       const transactionData = transactions.rows;
       const invoices = await db.query(
-        "SELECT *, LI_DATE AS log_date FROM LOAN_INVOICE INNER JOIN TRANSACTION ON T_ID = LI_T_ID WHERE T_ACC_KTP_NUM = $1",
+        "SELECT *, LI_PAYMENT_DATE AS log_date, LI_ID AS log_id, LI_TOTAL_PAYMENT AS log_money FROM LOAN_INVOICE INNER JOIN TRANSACTION ON T_ID = LI_T_ID WHERE T_ACC_KTP_NUM = $1",
         [req.session.user.acc_ktp_num]
       );
       const invoicesData = invoices.rows;
@@ -414,11 +414,11 @@ app.post("/transaction", async (req, res) => {
         [req.session.user.acc_ktp_num, period, loan]
       );
       const transactions = await db.query(
-        "SELECT *, T_DATE AS log_date FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID DESC",
+        "SELECT *, T_DATE AS log_date, T_ID AS log_id, T_LOAN AS log_money FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID DESC",
         [req.session.user.acc_ktp_num]
       );
       const invoices = await db.query(
-        "SELECT *, LI_DATE AS log_date FROM LOAN_INVOICE INNER JOIN TRANSACTION ON T_ID = LI_T_ID WHERE T_ACC_KTP_NUM = $1",
+        "SELECT *, LI_PAYMENT_DATE AS log_date, LI_ID AS log_id, LI_TOTAL_PAYMENT AS log_money FROM LOAN_INVOICE INNER JOIN TRANSACTION ON T_ID = LI_T_ID WHERE T_ACC_KTP_NUM = $1",
         [req.session.user.acc_ktp_num]
       );
       const invoicesData = invoices.rows;
