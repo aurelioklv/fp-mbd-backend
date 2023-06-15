@@ -381,7 +381,7 @@ app.get("/transaction", updateUserDataMiddleware, async (req, res) => {
       );
       const transactionData = transactions.rows;
       const invoices = await db.query(
-        "SELECT * FROM LOAN_INVOICE INNER JOIN TRANSACTION WHERE T_ACC_KTP_NUM = $1",
+        "SELECT * FROM LOAN_INVOICE INNER JOIN TRANSACTION ON T_ID = LI_T_ID WHERE T_ACC_KTP_NUM = $1",
         [req.session.user.acc_ktp_num]
       );
       const invoicesData = invoices.rows;
@@ -418,7 +418,7 @@ app.post("/transaction", async (req, res) => {
         [req.session.user.acc_ktp_num]
       );
       const invoices = await db.query(
-        "SELECT * FROM LOAN_INVOICE INNER JOIN TRANSACTION WHERE T_ACC_KTP_NUM = $1",
+        "SELECT * FROM LOAN_INVOICE INNER JOIN TRANSACTION ON T_ID = LI_T_ID WHERE T_ACC_KTP_NUM = $1",
         [req.session.user.acc_ktp_num]
       );
       const invoicesData = invoices.rows;
