@@ -220,6 +220,14 @@ app.get("/home", updateUserDataMiddleware, async (req, res) => {
   }
 });
 
+app.get("/admin", async (req, res) => {
+  try {
+    res.render("admin.ejs", {});
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
 app.get("/account", updateUserDataMiddleware, async (req, res) => {
   try {
     if (req.session.loggedIn) {
