@@ -222,7 +222,40 @@ app.get("/home", updateUserDataMiddleware, async (req, res) => {
 
 app.get("/admin", async (req, res) => {
   try {
-    res.render("admin.ejs", {});
+    const total_pengguna = await db.query('SELECT COUNT (*) AS TOTAL_ACCOUNT FROM ACCOUNT');
+    const total_account = total_pengguna.rows[0].total_account;
+
+    const total_penalti = await db.query('SELECT COUNT(LI_PENALTY) AS TOTAL_PENALTI FROM LOAN_INVOICE WHERE LI_PENALTY > 0 AND LI_STATUS = FALSE');
+    const total_penalty = total_penalti.rows[0].total_penalti;
+
+    const frekuensi_periode = await db.query('SELECT T_LT_PERIOD AS MOST_PICKED_PERIODE, COUNT(ACCOUNT.ACC_KTP_NUM) AS SUM FROM TRANSACTION INNER JOIN ACCOUNT ON ACCOUNT.ACC_KTP_NUM = TRANSACTION.T_ACC_KTP_NUM GROUP BY T_LT_PERIOD ORDER BY SUM DESC');
+    const period_frequency = frekuensi_periode.rows[0].most_picked_periode;
+
+    const gaji_ratarata = await db.query('SELECT ROUND(AVG(ACC_SALARY),2) AS AVERAGE_SALARY FROM ACCOUNT');
+    const average_salary = gaji_ratarata.rows[0].average_salary;
+
+    const peminjaman_ratarata = await db.query(`SELECT ROUND(SUM(T.T_LOAN) / COUNT(DISTINCT A.ACC_KTP_NUM), 2) AS AVERAGE_LOAN_PER_MONTH
+    FROM ACCOUNT A, transaction T
+    WHERE T.T_ACC_KTP_NUM = A.ACC_KTP_NUM
+    AND EXTRACT(MONTH FROM T.T_DATE) = EXTRACT(MONTH FROM CURRENT_DATE)
+    AND EXTRACT(YEAR FROM T.T_DATE) = EXTRACT(YEAR FROM CURRENT_DATE)
+    GROUP BY EXTRACT(MONTH FROM T.T_DATE), EXTRACT(YEAR FROM T.T_DATE);`)
+    const average_loan_per_month = peminjaman_ratarata.rows[0].average_loan_per_month;
+    
+    const total_pinjaman = await db.query('SELECT ROUND (SUM (T_LOAN),2) AS TOTAL_LOAN FROM TRANSACTION');
+    const total_loan = total_pinjaman.rows[0].total_loan;
+
+    const peminjam_bermasalah = await db.query(`SELECT ACC_KTP_NUM, ACC_NAME, ACC_ADDRESS, ACC_PHONE_NUM, ACC_EMERGENCY_PHONE_NUM, ACC_EMERGENCY_CONTACT_RELATIONSHIP, ACC_RATING, T_LT_PERIOD,
+		LI_T_ID, LI_ID, LI_NO, LI_STATUS, LI_TOTAL_PAYMENT
+    FROM LOAN_INVOICE LI
+    INNER JOIN TRANSACTION T ON LI.LI_T_ID = T.T_ID
+    INNER JOIN ACCOUNT A ON A.ACC_KTP_NUM =  T.T_ACC_KTP_NUM
+    WHERE LI.LI_PENALTY > 0 AND LI_STATUS = FALSE`);
+
+    const problem_loaner = peminjam_bermasalah.rows;
+    const data_dashboard = {total_account, total_penalty, period_frequency, average_salary, average_loan_per_month, total_loan};
+
+    res.render("admin.ejs", {data_dashboard, problem_loaner});
   } catch (err) {
     console.log(err.message);
   }
