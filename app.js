@@ -362,17 +362,28 @@ app.post("/transaction", async (req, res) => {
   try {
     if (req.session.loggedIn) {
       const { loan, period } = req.body;
-      const transactions = await db.query(
+      const new_transaction = await db.query(
         `INSERT INTO TRANSACTION (
           T_ACC_KTP_NUM, T_LT_PERIOD,
           T_DATE,
           T_LOAN,
           T_MONTHLY_PAYMENT,
           T_PAYMENT_COUNT)
-          VALUES($1, $2, date_trunc('second', CURRENT_TIMESTAMP), $3, NULL, 0);`,
+          VALUES($1, $2, date_trunc('second', CURRENT_TIMESTAMP), $3, NULL, 0)
+          RETURNING *;`,
         [req.session.user.acc_ktp_num, period, loan]
       );
-      res.redirect("/transaction");
+      const transactions = await db.query(
+        "SELECT * FROM TRANSACTION WHERE T_ACC_KTP_NUM = $1 ORDER BY T_ID DESC",
+        [req.session.user.acc_ktp_num]
+      );
+      const transactionData = transactions.rows;
+      const newTransactionData = new_transaction.rows[0];
+      res.render("transaksi.ejs", {
+        transactions: transactionData,
+        user: req.session.user,
+        newTransaction: newTransactionData,
+      });
     } else {
       res.redirect("/login");
     }
