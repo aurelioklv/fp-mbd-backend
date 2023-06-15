@@ -252,10 +252,19 @@ app.get("/admin", async (req, res) => {
     INNER JOIN ACCOUNT A ON A.ACC_KTP_NUM =  T.T_ACC_KTP_NUM
     WHERE LI.LI_PENALTY > 0 AND LI_STATUS = FALSE`);
 
+    const akun_penalti = await db.query(`SELECT ACC_KTP_NUM, ACC_NAME, ACC_PHONE_NUM, ACC_ADDRESS, ACC_EMERGENCY_PHONE_NUM, ACC_EMERGENCY_CONTACT_RELATIONSHIP
+    FROM LOAN_INVOICE LI
+    INNER JOIN TRANSACTION T ON LI.LI_T_ID = T.T_ID
+    INNER JOIN ACCOUNT A ON A.ACC_KTP_NUM =  T.T_ACC_KTP_NUM
+    WHERE LI.LI_PENALTY > 0 AND LI_STATUS = FALSE
+    GROUP BY A.ACC_KTP_NUM`);
+
+    const penalty_account = akun_penalti.rows;
+
     const problem_loaner = peminjam_bermasalah.rows;
     const data_dashboard = {total_account, total_penalty, period_frequency, average_salary, average_loan_per_month, total_loan};
 
-    res.render("admin.ejs", {data_dashboard, problem_loaner});
+    res.render("admin.ejs", {data_dashboard, problem_loaner, penalty_account});
   } catch (err) {
     console.log(err.message);
   }
