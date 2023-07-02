@@ -249,8 +249,11 @@ app.get("/admin", async (req, res) => {
     AND EXTRACT(MONTH FROM T.T_DATE) = EXTRACT(MONTH FROM CURRENT_DATE)
     AND EXTRACT(YEAR FROM T.T_DATE) = EXTRACT(YEAR FROM CURRENT_DATE)
     GROUP BY EXTRACT(MONTH FROM T.T_DATE), EXTRACT(YEAR FROM T.T_DATE);`);
+
     const average_loan_per_month =
-      peminjaman_ratarata.rows[0].average_loan_per_month;
+      peminjaman_ratarata.rows.length > 0
+        ? peminjaman_ratarata.rows[0].average_loan_per_month
+        : 0;
 
     const total_pinjaman = await db.query(
       "SELECT ROUND (SUM (T_LOAN),2) AS TOTAL_LOAN FROM TRANSACTION"
