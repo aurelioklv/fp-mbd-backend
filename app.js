@@ -4,7 +4,9 @@ const cors = require("cors");
 const { db } = require("./db");
 const session = require("express-session");
 const crypto = require("crypto-js");
-const port = 5000;
+require("dotenv").config();
+
+const port = process.env.PORT;
 
 // Middleware
 app.use(cors());
@@ -23,6 +25,11 @@ app.use(
 );
 
 app.set("view engine", "ejs");
+
+app.get("/info", (req, res) => {
+  console.log(process.env);
+  res.send();
+});
 
 app.get("/", async (req, res) => {
   try {
